@@ -1,0 +1,46 @@
+# Core Frameworks
+fastapi==0.116.1
+uvicorn[standard]==0.29.0
+
+# AI Agent Orchestration
+langchain==0.3.26
+semantic-router==0.0.72
+
+
+
+# Deep Learning & Model Inference
+torch==2.2.2
+torchvision==0.17.2
+keras==3.2.1
+transformers==4.53.2
+
+# Frontend UI Prototyping
+streamlit==1.47.0
+gradio==4.25.0
+
+# Database & ORM
+sqlalchemy==2.0.30
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# Task Queues
+celery==5.3.6
+redis==5.0.4
+
+# Logging & Monitoring
+loguru==0.7.2
+sentry-sdk==2.0.1
+
+# Container & Routing Support
+python-dotenv==1.0.1
+httpx==0.27.0
+pydantic==2.11.7
+
+# Optional: Embedding Search
+weaviate-client==4.16.1
+faiss-cpu==1.7.4
+
+# Dev & Testing
+pytest==8.2.2
+pytest-asyncio==0.23.7
+requests==2.32.4
