@@ -1,0 +1,73 @@
+# 🚫 Virtual environments
+medai_env/
+*.dll
+*.lib
+
+.venv/
+venv/
+
+# 🐍 Python artifacts
+__pycache__/
+*.py[cod]
+*.so
+
+# 🧬 Model weights and checkpoints
+*.h5
+*.pt
+*.ckpt
+*.pth
+checkpoints/
+runs/
+logs/
+
+# 📊 Data files
+*.csv
+*.tsv
+*.xlsx
+*.json
+*.xml
+*.db
+*.sqlite3
+*.npy
+*.npz
+*.pkl
+data/
+datasets/
+
+# 📸 Medical images
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.dcm
+*.nii
+*.tiff
+images/
+raw_data/
+
+# 🔐 Secrets and configs
+.env
+.env.*
+*.key
+*.pem
+
+# 🧰 IDE and OS clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 🐳 Docker artifacts
+*.log
+*.pid
+*.sock
+docker-compose.override.yml
+__docker_build__/
+
+# 🧠 LLM and agent artifacts
+*.cache
+*.bin
+*.tokenizer
+*.onnx
+*.safetensors
+agents/
