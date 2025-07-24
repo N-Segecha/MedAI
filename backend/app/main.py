@@ -54,3 +54,14 @@ async def predict_first_aid(request: Request):
     context = payload.get("context", {})
     result = agent.triage(symptoms, context)
     return result
+
+from backend.app.models.eye_agent import EyeAgent
+from backend.app.schemas.response_models import OCTDiagnosisOutput
+
+eye_agent = EyeAgent()
+
+@app.post("/predict/eye", response_model=OCTDiagnosisOutput)
+async def predict_eye(image: UploadFile = File(...)):
+    tensor = await preprocess_oct(image)  # your loader function
+    result = eye_agent.predict(tensor)
+    return result
