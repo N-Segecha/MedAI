@@ -1,0 +1,5 @@
+agent_name: LLAMA_FirstAid_Stub
+version: 0.1
+decision_logic: "keyword_rules"
+confidence_range: [0.6, 0.8]
+fallback_agent: CHW_Toolkit

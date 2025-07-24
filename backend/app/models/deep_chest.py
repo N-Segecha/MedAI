@@ -5,7 +5,7 @@ import os
 
 class DeepChestModel:
     def __init__(self):
-        model_path = os.path.join(os.path.dirname(__file__), "deep_chest", "pretrained_model.h5")
+        model_path = os.path.join(os.path.dirname(__file__), "deep_chest", "chest_xray_model.h5")
         self.model = load_model(model_path)
         self.labels = ["Edema", "Pneumonia", "Nodule", "Effusion", "Atelectasis"]
 
