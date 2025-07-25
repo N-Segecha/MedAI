@@ -57,6 +57,8 @@ async def predict_first_aid(request: Request):
 
 from backend.app.models.eye_agent import EyeAgent
 from backend.app.schemas.response_models import OCTDiagnosisOutput
+from backend.app.utils.preprocessing import preprocess_oct
+
 
 eye_agent = EyeAgent()
 
@@ -75,7 +77,7 @@ skin_gpt_model = SkinGPTModel(
 )
 
 
-from backend.app.models.skin_gpt.agent_router import SkinDiagnosisRouter
+from backend.app.models.agent_router import SkinDiagnosisRouter
 router = SkinDiagnosisRouter()
 
 @app.post("/predict/skin/rf")

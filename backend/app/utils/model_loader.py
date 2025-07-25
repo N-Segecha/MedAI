@@ -1,6 +1,6 @@
-from llama_first_aid import FirstAidAgentStub
-from backend.app.models.skin_gpt.skin_gpt_model import SkinGPTModel
-from backend.app.models.skin_gpt.skin_rf_model import SkinRFModel
+from backend.app.models.llama_first_aid import FirstAidAgentStub
+from backend.app.models.skin_gpt import SkinGPTModel
+from backend.app.models.rf_wrapper import RFClassifier
 from backend.app.models.eye_agent import EyeAgent
 import yaml
 
@@ -14,7 +14,7 @@ def load_skin_rf_model(config_path="./configs/agent_weights/skin_gpt_agents.yml"
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     rf_cfg = config["skin_gpt_agents"]["random_forest"]
-    return SkinRFModel(
+    return RFClassifier(
         model_path=rf_cfg["artifact_path"],
         features_path=rf_cfg["feature_spec"]
     )

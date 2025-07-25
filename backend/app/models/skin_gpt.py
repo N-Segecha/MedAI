@@ -26,7 +26,17 @@ class SkinGPTModel:
 
             self.model = SkinClassifier(num_classes=len(self.index_to_label))
             weights = torch.load(model_path, map_location=self.device)
-            self.model.load_state_dict(weights)
+            # 🔍 Inspect checkpoint keys
+            print("🔍 Checkpoint contains the following keys:")
+            for k in weights.keys():
+               print(k)
+
+
+            try:
+                self.model.load_state_dict(weights)  # strict=True by default
+            except RuntimeError as mismatch:
+                raise RuntimeError("🔍 Checkpoint mismatch with model architecture:\n" + str(mismatch))
+
             self.model.to(self.device)
             self.model.eval()
 
@@ -34,6 +44,10 @@ class SkinGPTModel:
                 transforms.Resize((224, 224)),
                 transforms.ToTensor()
             ])
+
+            print("✅ SkinClassifier initialized with ResNet50 backbone and", len(self.index_to_label), "output classes")
+            print("🧩 Sample checkpoint keys:", [k for k in weights.keys() if "fc" in k][-2:])
+
         except Exception as e:
             raise RuntimeError("Model setup failed. Try a smaller checkpoint or verify your cache.\n" + str(e))
 
@@ -58,3 +72,4 @@ class SkinGPTModel:
                 }
         except Exception as e:
             return {"error": str(e), "source": image_path}
+
