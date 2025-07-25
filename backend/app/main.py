@@ -1,3 +1,6 @@
+import sys
+sys.path.append("C:/Users/N SEGECHE/Documents/GitHub/MedAI")
+
 from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 import tempfile, os
