@@ -65,3 +65,47 @@ async def predict_eye(image: UploadFile = File(...)):
     tensor = await preprocess_oct(image)  # your loader function
     result = eye_agent.predict(tensor)
     return result
+
+# 🧬 SkinGPT + RF from Tabular + Vision
+from backend.app.models.skin_gpt import SkinGPTModel
+
+skin_gpt_model = SkinGPTModel(
+    model_path="backend/app/models/skin_gpt/skin_gpt.pth",
+    label_csv="backend/app/models/skin_gpt/rf_class_weights.csv"
+)
+
+
+from backend.app.models.skin_gpt.agent_router import SkinDiagnosisRouter
+router = SkinDiagnosisRouter()
+
+@app.post("/predict/skin/rf")
+async def predict_skin_rf(file: UploadFile = File(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
+        contents = await file.read()
+        tmp.write(contents)
+        tmp_path = tmp.name
+    result_df = router.run_rf(tmp_path)
+    os.remove(tmp_path)
+    return {
+        "diagnosis": result_df.to_dict(orient="records"),
+        "model": "Random Forest - Dermatology CSV",
+        "status": "Success"
+    }
+
+@app.post("/predict/skin/gpt")
+async def predict_skin_gpt(image: UploadFile = File(...), prompt: str = Form(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+        contents = await image.read()
+        tmp.write(contents)
+        tmp_path = tmp.name
+    result = router.run_gpt(tmp_path, prompt)
+    os.remove(tmp_path)
+    return {
+        "diagnosis": str(result),
+        "model": "SkinGPT-4 (Vicuna-13B)",
+        "status": "Success"
+    }
+
+@app.get("/predict/skin/metadata")
+def get_skin_model_metadata():
+    return router.metadata()

@@ -1,43 +1,60 @@
+import os
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+import pandas as pd
+import torchvision.transforms as transforms
+from PIL import Image
+
+from .skin_classifier import SkinClassifier  # ✅ Assumes skin_classifier.py is in models/
 
 class SkinGPTModel:
-    def __init__(self, model_id="microsoft/phi-2"):
-        self.device = "cpu"  # 💡 Explicit CPU assignment
-        print(f"🔧 Initializing SkinGPT on {self.device} using model: {model_id}")
+    def __init__(
+        self,
+        model_path="backend/app/models/skin_gpt/skin_gpt.pth",
+        label_csv="backend/app/models/skin_gpt/rf_class_weights.csv",
+        device=None
+    ):
+        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # 🧠 Load tokenizer safely
-        try:
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                model_id,
-                use_fast=False,
-                legacy=True,
-                local_files_only=False
-            )
-            print("✅ Tokenizer loaded")
-        except Exception as e:
-            print(f"❌ Tokenizer failed: {type(e).__name__} — {e}")
-            raise RuntimeError("Tokenizer setup failed. Check model name or internet connection.")
+        if not os.path.exists(model_path):
+            raise RuntimeError(f"❌ Checkpoint not found: {model_path}")
+        if not os.path.exists(label_csv):
+            raise RuntimeError(f"❌ Label CSV not found: {label_csv}")
 
-        # ⚡ Load model with fallback
         try:
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_id,
-                torch_dtype=torch.float32,
-                local_files_only=False
-            )
+            df = pd.read_csv(label_csv)
+            self.index_to_label = {i: label for i, label in enumerate(df.columns)}
+
+            self.model = SkinClassifier(num_classes=len(self.index_to_label))
+            weights = torch.load(model_path, map_location=self.device)
+            self.model.load_state_dict(weights)
             self.model.to(self.device)
             self.model.eval()
-            print("✅ Model loaded and ready")
-        except Exception as e:
-            print(f"❌ Model load failed: {type(e).__name__} — {e}")
-            raise RuntimeError("Model setup failed. Try a smaller checkpoint or verify your cache.")
 
-    def diagnose(self, prompt, max_tokens=512):
-        print(f"🩺 Diagnosing: {prompt[:50]}...")
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-        with torch.no_grad():
-            output = self.model.generate(**inputs, max_new_tokens=max_tokens)
-        result = self.tokenizer.decode(output[0], skip_special_tokens=True)
-        print(f"📋 Diagnosis complete")
-        return result
+            self.transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor()
+            ])
+        except Exception as e:
+            raise RuntimeError("Model setup failed. Try a smaller checkpoint or verify your cache.\n" + str(e))
+
+    def diagnose(self, image_path):
+        if not os.path.exists(image_path):
+            return {"error": f"Image not found: {image_path}", "source": image_path}
+        try:
+            image = Image.open(image_path).convert("RGB")
+            image = self.transform(image).unsqueeze(0).to(self.device)
+
+            with torch.no_grad():
+                outputs = self.model(image)
+                probs = torch.softmax(outputs, dim=1)
+                pred_idx = probs.argmax(dim=1).item()
+                confidence = probs[0][pred_idx].item()
+                label = self.index_to_label[pred_idx]
+
+                return {
+                    "prediction": label,
+                    "confidence": round(confidence, 4),
+                    "source": image_path
+                }
+        except Exception as e:
+            return {"error": str(e), "source": image_path}
