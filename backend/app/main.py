@@ -1,9 +1,11 @@
-import sys
-sys.path.append("C:/Users/N SEGECHE/Documents/GitHub/MedAI")
+import sys, os, tempfile, datetime, contextlib
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-import tempfile, os
+
+# 🕒 Capture startup timestamp
+startup_timestamp = datetime.datetime.now().isoformat()
 
 # 🔧 Unified App Instance
 app = FastAPI(title="MedAI - Diagnostic API", version="0.1.0")
@@ -15,29 +17,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/ping")
+@app.get("/ping", tags=["Health Check"])
 def ping():
-    return {"status": "MedAI backend is alive!"}
+    return {
+        "status": "MedAI backend is alive!",
+        "timestamp": startup_timestamp
+    }
 
-# 🚑 DeepChest
+# 🚑 DeepChest Agent
 from backend.app.models.deep_chest import DeepChestModel
 deep_chest_model = DeepChestModel()
 
-@app.post("/predict/xray")
+@app.post("/predict/xray", tags=["Chest X-ray"])
 async def predict_xray(file: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        contents = await file.read()
-        tmp.write(contents)
+        tmp.write(await file.read())
         tmp_path = tmp.name
-    results = deep_chest_model.predict(tmp_path)
-    os.remove(tmp_path)
-    return {"diagnosis": results}
+    try:
+        results = deep_chest_model.predict(tmp_path)
+        return {"diagnosis": results}
+    finally:
+        os.remove(tmp_path)
 
-# 🧬 SkinGPT
+# 🧬 SkinGPT Agent (Restart-safe)
 from backend.app.models.skin_gpt import SkinGPTModel
-skin_gpt_model = SkinGPTModel()
+try:
+    skin_gpt_model = SkinGPTModel(
+        model_path="backend/app/models/skin_gpt/skin_gpt.pth",
+        label_csv="backend/app/models/skin_gpt/rf_class_weights.csv"
+    )
+    print("✅ SkinGPTModel loaded successfully.")
+except RuntimeError as e:
+    print(f"⚠️ SkinGPTModel failed to load: {e}")
+    from backend.app.models.skin_gpt_stub import SkinGPTStub
+    skin_gpt_model = SkinGPTStub()
+    os.makedirs("logs", exist_ok=True)
+    with open("logs/model_load.log", "a") as log_file:
+        log_file.write(f"[SkinGPTModel] Load failed: {str(e)}\n")
 
-@app.post("/predict/skin")
+@app.post("/predict/skin", tags=["Skin Diagnosis"])
 async def predict_skin(prompt: str = Form(...)):
     result = skin_gpt_model.diagnose(prompt)
     return {
@@ -50,67 +68,66 @@ async def predict_skin(prompt: str = Form(...)):
 from backend.app.models.llama_first_aid import FirstAidAgentStub
 agent = FirstAidAgentStub()
 
-@app.post("/predict/first_aid")
+@app.post("/predict/first_aid", tags=["First Aid"])
 async def predict_first_aid(request: Request):
     payload = await request.json()
-    symptoms = payload.get("symptoms", "")
-    context = payload.get("context", {})
-    result = agent.triage(symptoms, context)
+    result = agent.triage(payload.get("symptoms", ""), payload.get("context", {}))
     return result
 
+# 👁️ EyeAgent
 from backend.app.models.eye_agent import EyeAgent
 from backend.app.schemas.response_models import OCTDiagnosisOutput
 from backend.app.utils.preprocessing import preprocess_oct
 
-
 eye_agent = EyeAgent()
 
-@app.post("/predict/eye", response_model=OCTDiagnosisOutput)
+@app.post("/predict/eye", response_model=OCTDiagnosisOutput, tags=["Eye Diagnosis"])
 async def predict_eye(image: UploadFile = File(...)):
-    tensor = await preprocess_oct(image)  # your loader function
+    tensor = await preprocess_oct(image)
     result = eye_agent.predict(tensor)
     return result
 
-# 🧬 SkinGPT + RF from Tabular + Vision
-from backend.app.models.skin_gpt import SkinGPTModel
-
-skin_gpt_model = SkinGPTModel(
-    model_path="backend/app/models/skin_gpt/skin_gpt.pth",
-    label_csv="backend/app/models/skin_gpt/rf_class_weights.csv"
-)
-
-
+# 🧬 Skin Diagnosis Router (RF + GPT)
 from backend.app.models.agent_router import SkinDiagnosisRouter
-router = SkinDiagnosisRouter()
+router = SkinDiagnosisRouter(skin_gpt_model=skin_gpt_model)
 
-@app.post("/predict/skin/rf")
+@app.post("/predict/skin/rf", tags=["Skin Diagnosis"])
 async def predict_skin_rf(file: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
-        contents = await file.read()
-        tmp.write(contents)
+        tmp.write(await file.read())
         tmp_path = tmp.name
-    result_df = router.run_rf(tmp_path)
-    os.remove(tmp_path)
-    return {
-        "diagnosis": result_df.to_dict(orient="records"),
-        "model": "Random Forest - Dermatology CSV",
-        "status": "Success"
-    }
+    try:
+        result_df = router.run_rf(tmp_path)
+        return {
+            "diagnosis": result_df.to_dict(orient="records"),
+            "model": "Random Forest - Dermatology CSV",
+            "status": "Success"
+        }
+    finally:
+        os.remove(tmp_path)
 
-@app.post("/predict/skin/gpt")
+@app.post("/predict/skin/gpt", tags=["Skin Diagnosis"])
 async def predict_skin_gpt(image: UploadFile = File(...), prompt: str = Form(...)):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
-        contents = await image.read()
-        tmp.write(contents)
+        tmp.write(await image.read())
         tmp_path = tmp.name
-    result = router.run_gpt(tmp_path, prompt)
-    os.remove(tmp_path)
-    return {
-        "diagnosis": str(result),
-        "model": "SkinGPT-4 (Vicuna-13B)",
-        "status": "Success"
-    }
+    try:
+        result = router.run_gpt(tmp_path, prompt)
+        return {
+            "diagnosis": str(result),
+            "model": "SkinGPT-4 (Vicuna-13B)",
+            "status": "Success"
+        }
+    finally:
+        os.remove(tmp_path)
 
-@app.get("/predict/skin/metadata")
-def get_skin_model_metadata():
-    return router.metadata()
+# 📊 Agent Status Route
+@app.get("/status/agents", tags=["Health Check"])
+def agent_status():
+    return {
+        "DeepChest": deep_chest_model.__class__.__name__,
+        "SkinGPT": skin_gpt_model.__class__.__name__,
+        "FirstAid": agent.__class__.__name__,
+        "EyeAgent": eye_agent.__class__.__name__,
+        "Router": router.__class__.__name__
+    }

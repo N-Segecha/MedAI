@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+  fastapi:
+    build:
+      context: ../          # gives access to lockfile and shared backend
+      dockerfile: backend/Dockerfile
+    container_name: medai_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./medai/configs/agent_weights:/app/configs/agent_weights
+      - ./medai/decision_trees:/app/decision_trees
+      - fastapi_logs:/app/logs
+      - skinagent_weights:/app/models/skin_gpt
+      - medai_wheels:/wheels   # ✅ surfaces wheel diagnostics from build stage
+    working_dir: /app
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  postgres:
+    image: postgres:15
+    container_name: pg_container
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - pgdata_new:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7.4.5
+    container_name: redis_container
+    restart: always
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - ./medai/configs/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata_new:
+  fastapi_logs:
+  skinagent_weights:
+  redis_data:
+  medai_wheels:        # ✅ enables host-side inspection of wheel artifacts
